@@ -1,11 +1,20 @@
 import argparse
 import os
 import pickle
+import traceback
 from statistics import mean
 from types import SimpleNamespace
 
 import wandb
 from option_keyboard.option_keyboard.main import run_training
+
+
+def _preload_env_dependencies(env_name):
+    """Import env dependencies in main thread before wandb agent threads start."""
+    if env_name.startswith("puffer_"):
+        # pufferlib.pufferl installs signal handlers at import-time.
+        # That must happen in the main thread, not in wandb worker threads.
+        from option_keyboard.envs import puffer_adapter  # noqa: F401
 
 
 def _read_pickle_records(path):
@@ -114,10 +123,16 @@ def _train_one_run(args):
         run.log({"ok_launch": 1})
         return_code = 0
         output = {}
+        error_msg = ""
+        error_tb = ""
         try:
             output = run_training(train_args) or {}
-        except Exception:
+        except Exception as exc:
             return_code = 1
+            error_msg = str(exc)
+            error_tb = traceback.format_exc()
+            print(f"[ERROR] {exp_name} failed: {error_msg}")
+            print(error_tb)
 
         exp_dir = output.get("log_dir", os.path.join(args.log_dir, exp_name))
         metrics = _latest_agent_metrics(exp_dir)
@@ -129,10 +144,17 @@ def _train_one_run(args):
         run.summary["ok_exp_name"] = exp_name
         run.summary["ok_exp_dir"] = exp_dir
         run.summary["ok_return_code"] = return_code
+        if error_msg:
+            run.summary["ok_error"] = error_msg
+        if error_tb:
+            run.summary["ok_traceback"] = error_tb
 
         if return_code != 0:
-            run.log({"ok_agent_mean_return": -1e9, "ok_failed": 1})
-            raise RuntimeError(f"Training failed for {exp_name} with return code {return_code}")
+            run.log({"ok_agent_mean_return": -1e9, "ok_failed": 1, "ok_error_step": 1})
+            raise RuntimeError(
+                f"Training failed for {exp_name}: {error_msg}\n"
+                f"Traceback:\n{error_tb}"
+            )
 
 
 def main():
@@ -170,6 +192,7 @@ def main():
 
     args.env_name = args.env_name
     os.makedirs(args.log_dir, exist_ok=True)
+    _preload_env_dependencies(args.env_name)
     wandb.tensorboard.patch(root_logdir=args.log_dir)
 
     sweep_config = _sweep_configuration(args)
