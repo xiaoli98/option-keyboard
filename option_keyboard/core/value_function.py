@@ -84,7 +84,7 @@ class ValueFunction:
                                                         self.n_options).to(device)),
                                            0)
 
-                except AttributeError:
+                except (AttributeError, TypeError) as e:
                     q_next = torch.zeros(1, self.n_options).to(device)
 
             td_error = self.batch['c'] + self.gamma * q_next - q

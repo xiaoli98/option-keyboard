@@ -6,6 +6,12 @@ from torch.optim import Adam
 from tensorboardX import SummaryWriter
 from option_keyboard.option_keyboard.test import test_agent
 import os
+from tqdm.auto import tqdm
+
+
+def _mean_present(values):
+    present = [x for x in values if x is not None]
+    return (sum(present) / len(present)) if present else None
 
 
 def keyboard_player(env, W, Q, alpha, eps, gamma, training_steps, batch_size,
@@ -49,14 +55,18 @@ def keyboard_player(env, W, Q, alpha, eps, gamma, training_steps, batch_size,
 
     # Load pretrained agent, if available
     if pretrained_agent:
-        checkpoint = torch.load(os.path.join(pretrained_agent, 'agent.pt'))
+        checkpoint = torch.load(os.path.join(pretrained_agent, 'agent.pt'),
+                                weights_only=False)
         n_steps = checkpoint['steps']
         Q_w.load_state_dict(checkpoint['Q'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         best_avg_return = checkpoint['best_avg_return']
 
     # Start learning
+    pbar = tqdm(total=training_steps, initial=n_steps,
+                desc='Stage2 Player', dynamic_ncols=True)
     while n_steps < training_steps:
+        prev_steps = n_steps
         if done:
             s = torch.from_numpy(env.reset()).float().to(device)
             done = False
@@ -87,7 +97,7 @@ def keyboard_player(env, W, Q, alpha, eps, gamma, training_steps, batch_size,
         # Update the networks
         if n_items_batch == batch_size:
             optimizer.zero_grad()
-            writer['writer'].add_scalar('agent/Q',
+            writer['writer'].add_scalar('stage2/agent/Q',
                                         q_loss.item(),
                                         n_steps + 1)
             q_loss.backward()
@@ -100,12 +110,22 @@ def keyboard_player(env, W, Q, alpha, eps, gamma, training_steps, batch_size,
         # Test the agent at intermediate time steps and save current and best
         # models
         if n_steps % test_interval == 0:
-            ep_returns = test_agent(env, W, Q_w, Q, gamma, n_steps,
-                                    max_ep_steps, device, n_test_runs,
-                                    log_file)
-            writer['writer'].add_scalar('episode_returns/Agent',
+            ep_returns, successes, true_episode_returns = test_agent(
+                env, W, Q_w, Q, gamma, n_steps, max_ep_steps, device,
+                n_test_runs, log_file)
+            writer['writer'].add_scalar('stage2/episode_returns/Agent',
                                         sum(ep_returns) / n_test_runs,
                                         n_steps)
+            avg_success = _mean_present(successes)
+            if avg_success is not None:
+                writer['writer'].add_scalar('stage2/environment/success',
+                                            avg_success,
+                                            n_steps)
+            avg_true_ep_return = _mean_present(true_episode_returns)
+            if avg_true_ep_return is not None:
+                writer['writer'].add_scalar('stage2/environment/episode_return',
+                                            avg_true_ep_return,
+                                            n_steps)
 
             torch.save({'steps': n_steps,
                         'Q': Q_w.state_dict(),
@@ -123,5 +143,9 @@ def keyboard_player(env, W, Q, alpha, eps, gamma, training_steps, batch_size,
                             },
                            os.path.join(log_dir, 'saved_models', 'best',
                                         'agent.pt'))
+        if n_steps > prev_steps:
+            pbar.update(n_steps - prev_steps)
 
+    pbar.close()
+    writer['writer'].close()
     return Q_w

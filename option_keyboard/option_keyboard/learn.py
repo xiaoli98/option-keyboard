@@ -5,6 +5,12 @@ from option_keyboard.core.value_function import ValueFunction
 from option_keyboard.core.utils import update, get_cumulant
 from option_keyboard.option_keyboard.test import test_learning_options
 from tensorboardX import SummaryWriter
+from tqdm.auto import tqdm
+
+
+def _mean_present(values):
+    present = [x for x in values if x is not None]
+    return (sum(present) / len(present)) if present else None
 
 
 def reset(s, d, device):
@@ -70,14 +76,18 @@ def learn_options(env, d, eps1, eps2, alpha, gamma, max_ep_steps, device,
         for i in range(d):
             checkpoint = torch.load(os.path.join(pretrained_options,
                                                  'value_fn_%d.pt' %
-                                                 (i + 1)))
+                                                 (i + 1)),
+                                    weights_only=False)
             n_steps = checkpoint['steps']
             value_fns[i].q_net.load_state_dict(checkpoint['Q'])
             value_fns[i].optimizer.load_state_dict(checkpoint['optimizer'])
             best_avg_return = checkpoint['best_avg_return']
 
     # Start learning
+    pbar = tqdm(total=training_steps, initial=n_steps,
+                desc='Stage1 Keyboard', dynamic_ncols=True)
     while n_steps < training_steps:
+        prev_steps = n_steps
 
         if done or n_steps % max_ep_steps == 0:
             s = env.reset()
@@ -90,7 +100,7 @@ def learn_options(env, d, eps1, eps2, alpha, gamma, max_ep_steps, device,
                 value_fns[i].terminate = True
                 loss = value_fns[i].update_batch([], device)
                 if loss is not None:
-                    writer['writer'].add_scalar('value_fn/Q_%d' % (i + 1),
+                    writer['writer'].add_scalar('stage1/value_fn/Q_%d' % (i + 1),
                                                 loss,
                                                 n_steps)
 
@@ -134,7 +144,7 @@ def learn_options(env, d, eps1, eps2, alpha, gamma, max_ep_steps, device,
                 transition = [h, a, h_next, a_next, cumulants[i]]
                 loss = value_fns[i].update_batch(transition, device)
                 if loss is not None:
-                    writer['writer'].add_scalar('value_fn/Q_%d' % (i + 1),
+                    writer['writer'].add_scalar('stage1/value_fn/Q_%d' % (i + 1),
                                                 loss,
                                                 n_steps)
 
@@ -149,7 +159,7 @@ def learn_options(env, d, eps1, eps2, alpha, gamma, max_ep_steps, device,
                 value_fns[i].terminate = True
                 loss = value_fns[i].update_batch(transition, device)
                 if loss is not None:
-                    writer['writer'].add_scalar('value_fn/Q_%d' % (i + 1),
+                    writer['writer'].add_scalar('stage1/value_fn/Q_%d' % (i + 1),
                                                 loss,
                                                 n_steps)
 
@@ -160,31 +170,52 @@ def learn_options(env, d, eps1, eps2, alpha, gamma, max_ep_steps, device,
 
             # Check performance over different configurations of w
             w = np.array([1, 1])
-            ep_returns1, _ = test_learning_options(env, value_fns, 0, w, gamma,
-                                                   n_steps, max_ep_steps,
-                                                   device, n_test_runs,
-                                                   log_files['1,1'])
-            writer['writer'].add_scalar('returns/w=1,1',
+            ep_returns1, _, success1, true_ep_return1 = test_learning_options(
+                env, value_fns, 0, w, gamma, n_steps, max_ep_steps, device,
+                n_test_runs, log_files['1,1'])
+            writer['writer'].add_scalar('stage1/returns/w=1,1',
                                         sum(ep_returns1) /
                                         n_test_runs, n_steps)
+            avg_success = _mean_present(success1)
+            if avg_success is not None:
+                writer['writer'].add_scalar('stage1/environment/success_w=1,1',
+                                            avg_success, n_steps)
+            avg_true_ep_return = _mean_present(true_ep_return1)
+            if avg_true_ep_return is not None:
+                writer['writer'].add_scalar('stage1/environment/episode_return_w=1,1',
+                                            avg_true_ep_return, n_steps)
 
             w = np.array([1, -1])
-            ep_returns2, _ = test_learning_options(env, value_fns, 0, w, gamma,
-                                                   n_steps, max_ep_steps,
-                                                   device, n_test_runs,
-                                                   log_files['1,-1'])
-            writer['writer'].add_scalar('returns/w=1,-1',
+            ep_returns2, _, success2, true_ep_return2 = test_learning_options(
+                env, value_fns, 0, w, gamma, n_steps, max_ep_steps, device,
+                n_test_runs, log_files['1,-1'])
+            writer['writer'].add_scalar('stage1/returns/w=1,-1',
                                         sum(ep_returns2) /
                                         n_test_runs, n_steps)
+            avg_success = _mean_present(success2)
+            if avg_success is not None:
+                writer['writer'].add_scalar('stage1/environment/success_w=1,-1',
+                                            avg_success, n_steps)
+            avg_true_ep_return = _mean_present(true_ep_return2)
+            if avg_true_ep_return is not None:
+                writer['writer'].add_scalar('stage1/environment/episode_return_w=1,-1',
+                                            avg_true_ep_return, n_steps)
 
             w = np.array([-1, 1])
-            ep_returns3, _ = test_learning_options(env, value_fns, 0, w, gamma,
-                                                   n_steps, max_ep_steps,
-                                                   device, n_test_runs,
-                                                   log_files['-1,1'])
-            writer['writer'].add_scalar('returns/w=-1,1',
+            ep_returns3, _, success3, true_ep_return3 = test_learning_options(
+                env, value_fns, 0, w, gamma, n_steps, max_ep_steps, device,
+                n_test_runs, log_files['-1,1'])
+            writer['writer'].add_scalar('stage1/returns/w=-1,1',
                                         sum(ep_returns3) /
                                         n_test_runs, n_steps)
+            avg_success = _mean_present(success3)
+            if avg_success is not None:
+                writer['writer'].add_scalar('stage1/environment/success_w=-1,1',
+                                            avg_success, n_steps)
+            avg_true_ep_return = _mean_present(true_ep_return3)
+            if avg_true_ep_return is not None:
+                writer['writer'].add_scalar('stage1/environment/episode_return_w=-1,1',
+                                            avg_true_ep_return, n_steps)
 
             # Save the current model
             for i in range(d):
@@ -211,5 +242,9 @@ def learn_options(env, d, eps1, eps2, alpha, gamma, max_ep_steps, device,
                                os.path.join(log_dir, 'saved_models',
                                             'best', 'value_fn_%d.pt'
                                             % (i + 1)))
+        if n_steps > prev_steps:
+            pbar.update(n_steps - prev_steps)
 
+    pbar.close()
+    writer['writer'].close()
     return value_fns

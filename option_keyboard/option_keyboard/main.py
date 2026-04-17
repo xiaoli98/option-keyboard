@@ -10,69 +10,78 @@ import numpy as np
 import os
 
 
-parser = argparse.ArgumentParser('OK')
-parser.add_argument('-e', '--env-name', default='ForagingWorld-v0',
-                    help='Name of environment')
-parser.add_argument('-s', '--seed', default=0, type=int,
-                    help='Random seed')
-parser.add_argument('--exp-name', required=True,
-                    help='Name of experiment')
-parser.add_argument('--n-test-runs', default=10, type=int,
-                    help='Number of episodes at each test run')
-parser.add_argument('--log-dir', default='/data/results',
-                    help='Specify path to directory where logs will be'
-                    'saved')
-# Option Keyboard parameters
-parser.add_argument('--gamma-ok', default=0.9, type=float,
-                    help='Discount factor for the Option Keyboard')
-parser.add_argument('--eps1-ok', default=0.2, type=float,
-                    help='Probability of changing the cumulant')
-parser.add_argument('--eps2-ok', default=0.1, type=float,
-                    help='Exploration parameter for the Option Keyboard')
-parser.add_argument('--alpha-ok', default=1e-4, type=float,
-                    help='Learning rate for the Option Keyboard - '
-                    'tried from [1e-1, 1e-2, 1e-3, 1e-4')
-parser.add_argument('--max-steps-ok', default=100, type=int,
-                    help='Maximum number of steps in an episode when the'
-                    'Option Keyboard is being trained')
-parser.add_argument('--n-training-steps-ok', default=5e5, type=int,
-                    help='Number of steps for which OK is to be trained')
-parser.add_argument('--ok-batch-size', default=10, type=int,
-                    help='Batch size for updating option Q-values')
-parser.add_argument('--pretrained-options', default='',
-                    help='Path to pretrained option models (experiment results'
-                    'directory)')
-parser.add_argument('--test-interval-option', default=1500, type=int,
-                    help='Interval at which option is tested')
-# Agent parameters
-parser.add_argument('-n', '--n-training-steps-agent', default=1e6, type=int,
-                    help='Number of training steps for which agent is to be'
-                    'trained')
-parser.add_argument('--agent-batch-size', default=10, type=int,
-                    help='Batch size for updating agent Q-values')
-parser.add_argument('--eps-agent', default=0.1, type=float,
-                    help='Exploration over weight vector w')
-parser.add_argument('--gamma-agent', default=0.99, type=float,
-                    help='Discount factor for the agent')
-parser.add_argument('--alpha-agent', default=1e-4, type=float,
-                    help='Learning rate for the agent - '
-                    'tried from [1e-1, 1e-2, 1e-3, 1e-4')
-parser.add_argument('--max-steps-agent', default=300, type=int,
-                    help='Maximum number of steps in an episode when the'
-                    'agent is being trained')
-parser.add_argument('--test-interval-agent', default=500, type=int,
-                    help='Interval at which agent is tested')
-parser.add_argument('--pretrained-agent', default='',
-                    help='Path to pretrained agent model (experiment results'
-                    'directory)')
-parser.add_argument('--scenario', default=1, type=int,
-                    help='Scenario (described in the paper)')
+def build_parser():
+    parser = argparse.ArgumentParser('OK')
+    parser.add_argument('-e', '--env-name', default='puffer_minigrid_reach',
+                        help='Name of environment (ForagingWorld-v0 or '
+                        'puffer_minigrid_reach)')
+    parser.add_argument('-s', '--seed', default=0, type=int,
+                        help='Random seed')
+    parser.add_argument('--exp-name', required=True,
+                        help='Name of experiment')
+    parser.add_argument('--n-test-runs', default=10, type=int,
+                        help='Number of episodes at each test run')
+    parser.add_argument('--log-dir', default='/data/results',
+                        help='Specify path to directory where logs will be'
+                        'saved')
+    # Option Keyboard parameters
+    parser.add_argument('--gamma-ok', default=0.9, type=float,
+                        help='Discount factor for the Option Keyboard')
+    parser.add_argument('--eps1-ok', default=0.2, type=float,
+                        help='Probability of changing the cumulant')
+    parser.add_argument('--eps2-ok', default=0.1, type=float,
+                        help='Exploration parameter for the Option Keyboard')
+    parser.add_argument('--alpha-ok', default=1e-4, type=float,
+                        help='Learning rate for the Option Keyboard - '
+                        'tried from [1e-1, 1e-2, 1e-3, 1e-4')
+    parser.add_argument('--max-steps-ok', default=100, type=int,
+                        help='Maximum number of steps in an episode when the'
+                        'Option Keyboard is being trained')
+    parser.add_argument('--n-training-steps-ok', default=5e5, type=int,
+                        help='Number of steps for which OK is to be trained')
+    parser.add_argument('--ok-batch-size', default=10, type=int,
+                        help='Batch size for updating option Q-values')
+    parser.add_argument('--pretrained-options', default='',
+                        help='Path to pretrained option models (experiment results'
+                        'directory)')
+    parser.add_argument('--test-interval-option', default=1500, type=int,
+                        help='Interval at which option is tested')
+    # Agent parameters
+    parser.add_argument('-n', '--n-training-steps-agent', default=1e6, type=int,
+                        help='Number of training steps for which agent is to be'
+                        'trained')
+    parser.add_argument('--agent-batch-size', default=10, type=int,
+                        help='Batch size for updating agent Q-values')
+    parser.add_argument('--eps-agent', default=0.1, type=float,
+                        help='Exploration over weight vector w')
+    parser.add_argument('--gamma-agent', default=0.99, type=float,
+                        help='Discount factor for the agent')
+    parser.add_argument('--alpha-agent', default=1e-4, type=float,
+                        help='Learning rate for the agent - '
+                        'tried from [1e-1, 1e-2, 1e-3, 1e-4')
+    parser.add_argument('--max-steps-agent', default=300, type=int,
+                        help='Maximum number of steps in an episode when the'
+                        'agent is being trained')
+    parser.add_argument('--test-interval-agent', default=500, type=int,
+                        help='Interval at which agent is tested')
+    parser.add_argument('--pretrained-agent', default='',
+                        help='Path to pretrained agent model (experiment results'
+                        'directory)')
+    parser.add_argument('--scenario', default=1, type=int,
+                        help='Scenario (described in the paper)')
+    return parser
 
 
-def main():
-    args = parser.parse_args()
+def make_env(env_name, scenario, seed):
+    """Create environment — either ForagingWorld or a pufferlib env."""
+    if env_name.startswith('puffer_'):
+        from option_keyboard.envs.puffer_adapter import load_puffer_env
+        return load_puffer_env(env_name, seed=seed)
+    return gym.make(env_name, scenario=scenario)
 
-    env = gym.make(args.env_name, scenario=args.scenario)
+
+def run_training(args):
+    env = make_env(args.env_name, args.scenario, args.seed)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     set_global_seed(args.seed)
@@ -101,11 +110,13 @@ def main():
         if args.n_training_steps_ok == 0:
             checkpoint = torch.load(os.path.join(args.pretrained_options,
                                                  'value_fn_%d.pt'
-                                                 % (i + 1)))
+                                                 % (i + 1)),
+                                    weights_only=False)
         else:
             checkpoint = torch.load(os.path.join(log_dir, 'saved_models',
                                                  'best', 'value_fn_%d.pt'
-                                                 % (i + 1)))
+                                                 % (i + 1)),
+                                    weights_only=False)
         Q_E[i].q_net.load_state_dict(checkpoint['Q'])
 
     W = [x for x in product([-1, 0, 1], repeat=2) if sum(x) >= 0]
@@ -128,6 +139,18 @@ def main():
                           n_test_runs=args.n_test_runs,
                           log_file=log_files['agent'],
                           log_dir=log_dir)
+
+    env.close()
+    return {
+        'log_dir': log_dir,
+        'log_files': log_files,
+    }
+
+
+def main():
+    parser = build_parser()
+    args = parser.parse_args()
+    run_training(args)
 
 
 if __name__ == '__main__':

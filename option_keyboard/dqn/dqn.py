@@ -5,6 +5,7 @@ from torch.optim import Adam
 from tensorboardX import SummaryWriter
 import os
 import pickle
+from tqdm.auto import tqdm
 
 
 def test_agent(env, Q, device, n_test_runs, test_log_file, n_steps,
@@ -85,14 +86,18 @@ def dqn(env, eps, gamma, alpha, device, training_steps, batch_size,
 
     # Load pretrained agent, if available
     if pretrained_agent:
-        checkpoint = torch.load(os.path.join(pretrained_agent, 'agent.pt'))
+        checkpoint = torch.load(os.path.join(pretrained_agent, 'agent.pt'),
+                                weights_only=False)
         n_steps = checkpoint['steps']
         Q.load_state_dict(checkpoint['Q'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         best_avg_return = checkpoint['best_avg_return']
 
     # Start learning
+    pbar = tqdm(total=training_steps, initial=n_steps,
+                desc='DQN Baseline', dynamic_ncols=True)
     while n_steps < training_steps:
+        prev_steps = n_steps
         q = Q(s)
 
         # Epsilon-greedy exploration
@@ -153,3 +158,6 @@ def dqn(env, eps, gamma, alpha, device, training_steps, batch_size,
                             },
                            os.path.join(log_dir, 'saved_models', 'best',
                                         'agent.pt'))
+        if n_steps > prev_steps:
+            pbar.update(n_steps - prev_steps)
+    pbar.close()

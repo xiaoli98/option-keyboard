@@ -3,6 +3,7 @@ import torch
 import random
 import pickle
 import os
+from datetime import datetime
 
 
 def set_global_seed(seed):
@@ -55,11 +56,11 @@ def create_log_files(args, n_cumulants):
         os.mkdir(args.log_dir)
     except FileExistsError:
         pass
-    try:
-        base_dir = os.path.join(args.log_dir, args.exp_name)
-        os.mkdir(base_dir)
-    except FileExistsError:
-        pass
+    base_dir = os.path.join(args.log_dir, args.exp_name)
+    if os.path.exists(base_dir):
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        base_dir = os.path.join(args.log_dir, f'{args.exp_name}_{timestamp}')
+    os.mkdir(base_dir)
 
     # Store hyperparameters
     hyperparam_file = open(os.path.join(base_dir, 'hyperparams'), 'a+b')
